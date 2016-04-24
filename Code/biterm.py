@@ -1,5 +1,5 @@
 import numpy as np
-import pickle, pandas, time, bisect
+import pandas, pickle, time, bisect
 from util import loadData
 from itertools import combinations
 from scipy.stats import rv_discrete
@@ -33,6 +33,7 @@ class Biterm(object):
 		self.n_z = np.zeros(K)
 		self.word_to_id = dict()
 		self.n_wGivenz = None
+		self.n_bGivenz = np.zeros(K)
 
 
 	def fit(self, X):
@@ -61,7 +62,6 @@ class Biterm(object):
 
 		# Initialize n_z, n_wiGivenZ, n_wjGivenZ, the later two are stored in self.n_wGivenz
 		self.initCount(X)
-		e = np.ones(self.M)
 		# Train
 		for i in xrange(N):
 			for j in xrange(len(self.biterms)):
@@ -69,11 +69,9 @@ class Biterm(object):
 				# Draw a topic for b from P(z|x_b, B, a, b)
 				p = np.zeros(self.K)				
 				p_num = (self.n_z + self.a)*(self.n_wGivenz[self.word_to_id[b[0]]]+self.b)*(self.n_wGivenz[self.word_to_id[b[1]]]+self.b)
-				p_det = np.dot(e,self.n_wGivenz)+self.M*self.b
+				p_det = self.n_bGivenz+self.M*self.b
 				p = p_num/(p_det*p_det)
-				p = 1.0*p/np.sum(p);
 				topic = self.sample(p)
-
 			
 				#Update n_z, n_wiGivenZ, n_wjGivenZ
 				self.updateCount(j, topic)
@@ -101,7 +99,7 @@ class Biterm(object):
 		"""
 		r = random.rand()
 		p_acc = np.cumsum(p)
-		topic =  bisect.bisect_right(p_acc,r)
+		topic =  bisect.bisect_right(p_acc,r*p_acc[-1])
 		return topic
 
 	def extractBiterms(self, X):
@@ -159,6 +157,7 @@ class Biterm(object):
 
 		for i in xrange(self.B):
 			topic_id = self.topicDist[i];
+			self.n_bGivenz[topic_id] += 1;
 			self.n_wGivenz[self.word_to_id[self.biterms[i][0]]][topic_id] += 1;
 			self.n_wGivenz[self.word_to_id[self.biterms[i][1]]][topic_id] += 1;
 
@@ -190,6 +189,11 @@ class Biterm(object):
 		# Update n_wj|z
 		self.n_wGivenz[self.word_to_id[self.biterms[biterm_id][1]]][old_topic] -= 1
 		self.n_wGivenz[self.word_to_id[self.biterms[biterm_id][1]]][new_topic] += 1
+
+		# Update n_b|z
+		self.n_bGivenz[old_topic] -= 1
+		self.n_bGivenz[new_topic] += 1
+
 
 	def calcPhi(self):
 		"""
@@ -226,6 +230,18 @@ class Biterm(object):
 		"""
 		return self.phi, self.theta
 
+	def perplexity(self):
+		'''
+			Returns the perplexity
+		'''
+		p_B = 0
+		for i in xrange(self.B):
+			p_b = 0
+			for j in xrange(self.K):
+				p_b += self.n_z[j]*self.n_wGivenz[self.word_to_id[self.biterms[i][0]]][j]*self.n_wGivenz[self.word_to_id[self.biterms[i][0]]][j]
+			p_B += -(1.0/self.B)*np.log(p_b)
+		return 2**p_B
+
 	def showTopics(self, n):
 		"""
 		Shows n words for each topic.
@@ -243,6 +259,7 @@ class Biterm(object):
 		for k in xrange(self.K):
 			max_phi[k] = [[row[0], row[1]] for row in self.phi[k][1:n+1]]
 		max_phi = [max_phi[i] + [self.theta[i]] for i in xrange(self.K)]
+		print max_phi
 		df = pandas.DataFrame(max_phi, 
 			['Topic ' + str(k+1) for k in xrange(self.K)], 
 			['Word ' + str(i+1) if i<n else 'P(topic)' for i in xrange(n+1)]).transpose()

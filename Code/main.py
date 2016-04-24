@@ -6,7 +6,7 @@ import preprocess, time, pickle
 file_name = '../Data/training.1600000.processed.noemoticon.csv'
 
 tweets = loadData(file_name)
-tweets = tweets[0:100]
+tweets = tweets[0:400]
 #tweets = [tweets[i] for i in np.random.permutation(len(tweets))]
 tweets = preprocess.preprocess(tweets)
 pickle.dump( tweets, open( "preprocessedData.pkl", "wb" ) )
@@ -14,10 +14,10 @@ print tweets
 
 
 
-number_of_topics = 30
+number_of_topics = 50
 a = 1
 b = 0.01
-max_iter = 20
+max_iter = 300
 
 
 bt = Biterm(a,b,number_of_topics,max_iter);
