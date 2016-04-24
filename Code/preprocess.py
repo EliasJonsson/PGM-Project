@@ -2,6 +2,7 @@ from nltk.corpus import stopwords
 from nltk.corpus import wordnet
 from string import punctuation
 import nltk
+from nltk.tokenize.casual import EMOTICON_RE
 from collections import Counter
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import TweetTokenizer
@@ -156,32 +157,6 @@ def lowercase(tweets):
 	tweets = [[w.lower() for w in t] for t in tweets]
 	return tweets
 
-#def removeSpaces(tweets):
-	'''
-	Remove all extra spaces
-
-	Input:
-	------------------
-	tweets: List of lists, [[word1OfTweet1, word2OfTweet1,...,word_m1OfTweet1],
-						   	  [word1OfTweet2, word2OfTweet2,...,word_m2OfTweet2],
-						   						. 								
-						   						. 
-						   						.
-						      [word1OfTweetN, word2OfTweetN,...,word_mNOfTweetN]]
-
-	Output:
-	-----------------
-	newTweets: tweets without extra spaces.
-	'''
-
-	# Erase all spaces.
-#	pat = r'^\s{1,}$'
-#	tweets = [[w for w in t if not re.search(pat,t)] for t in tweets]
-
-#	return tweets
-
-
-
 def removeStopwords(tweets):
 	'''
 	Remove all stopwords
@@ -277,8 +252,13 @@ def remove_short_tweets(tweets):
 	-----------------
 	newTweets: All the tweets in tweets except all tweets shorter or equal to two words are removed.
 	'''	
-	tweets = [t for t in tweets if len(t) > 2]
-	return tweets
+	tweets_dict = {i: t for i, t in enumerate(tweets) if len(t) > 2}
+	return tweets_dict
+
+def strip_emoticon(tweets):
+	no_emoticon = [[re.sub(r'(?!\n)\s+', ' ', EMOTICON_RE.sub('', token)) for token in tweet if tweet] for tweet in tweets]
+
+	return [[token for token in tweet if token] for tweet in no_emoticon]
 
 def preprocess(tweets):
 	'''
@@ -293,28 +273,19 @@ def preprocess(tweets):
 	newTweets: tweets ready for the training of topic models.
 	'''
 	tweets = splitWords(tweets)
+	tweets = strip_emoticon(tweets)
 	tweets = removeHTMLTags(tweets)
 	tweets = removeUsers(tweets)
 	tweets = removeURL(tweets)
 	tweets = removeEllipsis(tweets)
 	tweets = removeShortWords(tweets)
 	tweets = lowercase(tweets)
-	#tweets = removeSpaces(tweets)
 	tweets = removeStopwords(tweets)
-	print tweets
 	tweets = lemmatize(tweets)
 	tweets = remove_infrequent_words(tweets)
-	tweets = remove_short_tweets(tweets)
-	print tweets
+	tweets_dict = remove_short_tweets(tweets)
 	
-	return tweets
-
-
-
-
-
-
-
+	return tweets_dict
 
 def get_wordnet_pos(tag):
 	'''
