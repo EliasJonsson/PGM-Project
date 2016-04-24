@@ -8,7 +8,7 @@ from numpy import random
 
 
 class Biterm(object):
-	def __init__(self, a, b, K, max_iter):
+	def __init__(self, a, b, K, max_iter, mdl):
 		"""
 		Initialize the biterm model
 
@@ -24,8 +24,9 @@ class Biterm(object):
 		self.b = b
 		self.K = K
 		self.max_iter = max_iter
+		self.modelID = mdl
 		
-
+		# Training
 		self.B = 0
 		self.M = 0
 		self.biterms = []
@@ -34,6 +35,11 @@ class Biterm(object):
 		self.word_to_id = dict()
 		self.n_wGivenz = None
 		self.n_bGivenz = np.zeros(K)
+
+		# Testing
+		self.BTest = 0
+		self.phiTest = None
+		self.bitermsTest = []
 
 
 	def fit(self, X):
@@ -55,7 +61,7 @@ class Biterm(object):
 		"""
 		N = self.max_iter
 		
-		self.extractBiterms(X)
+		[self.biterms, self.B] = self.extractBiterms(X)
 
 		# Initialize topic assignments randomly for all the biterms.
 		self.topicDist = np.random.randint(self.K, size = self.B)
@@ -78,7 +84,8 @@ class Biterm(object):
 			print i
 		self.calcPhi()
 		self.calcTheta()
-		pickle.dump( [self.n_wGivenz,self.word_to_id, self.n_z], open( "parameters.pkl", "wb" ) )
+
+		print self.perplexity(X,self.phi)
 
 
 		return self
@@ -115,11 +122,14 @@ class Biterm(object):
 						   						.
 						   [word1OfTweetN, word2OfTweetN,...,word_mNOfTweetN]]
 
+		type_of_data:	'Training' for the training set, 'Valid' for the validation set.
 
 		"""
+		biterms = []
 		for tweet in X:
-			self.biterms += list(combinations(tweet, 2))
-		self.B = len(self.biterms)
+			biterms += list(combinations(tweet, 2))
+		B = len(biterms)
+		return biterms, B
 
 	def initCount(self, X):
 		"""
@@ -209,7 +219,7 @@ class Biterm(object):
 			sum_n =  sum(n_wGivenz[k])
 			for w in self.word_to_id:
 				self.phi[k] = self.phi[k] + [[w, 1.0*(n_wGivenz[k][self.word_to_id[w]]+self.b)/(sum_n+self.M*self.b)]]
-			self.phi[k] = sorted(self.phi[k], key=itemgetter(1), reverse = True)
+			
 
 
 
@@ -230,17 +240,69 @@ class Biterm(object):
 		"""
 		return self.phi, self.theta
 
-	def perplexity(self):
+	def smooth(self):
+		"""
+			delta-smoothing on self.phiTest
+		"""
+		minProb = min(min([[w for w in k if w[1] >1] for k in phi]))
+		delta = minProb/10.0**4
+		NV = len(phi)
+		MV = len(phi[0])
+		N = len(self.phi)
+		M = len(self.phi[0])
+		for i in xrange(len(phi)):
+			for j in xrange(len(phi[i])):
+				phi[i][j] = (phi[i][j]+delta)/(N*M+delta*NV*MV)
+		return phi
+
+	def perplexity(self, X, phi, type_of_data = 'Training'):
 		'''
 			Returns the perplexity
+
+			Input:
+			------------------
+			X: List of lists, [[word1OfTweet1, word2OfTweet1,...,word_m1OfTweet1],
+							   [word1OfTweet2, word2OfTweet2,...,word_m2OfTweet2],
+						   						. 								
+						   						. 
+						   						.
+							   [word1OfTweetN, word2OfTweetN,...,word_mNOfTweetN]]
+			type_of_data:	'Training' for the training set, 'Valid' for the validation set.
 		'''
+		if type_of_data == 'Valid':
+			[self.bitermsTest, self.BTest] = self.extractBiterms(X)
+			phi = self.addNewWords(self.bitermsTest)
+			self.smooth();
 		p_B = 0
 		for i in xrange(self.B):
 			p_b = 0
 			for j in xrange(self.K):
-				p_b += self.n_z[j]*self.n_wGivenz[self.word_to_id[self.biterms[i][0]]][j]*self.n_wGivenz[self.word_to_id[self.biterms[i][0]]][j]
+				p_b += self.theta[j]*phi[j][i]*phi[k][i]
 			p_B += -(1.0/self.B)*np.log(p_b)
 		return 2**p_B
+
+
+
+
+	def addNewWords(self,biterms):
+		'''
+			Add new words into the self.phiTest that appear inside self.bitermsTest
+		'''
+		phiTest = [[[w[0], w[1]]for w in k] for k in self.phi]
+		k = self.M + 1;
+		word_to_idTest = self.word_to_id.copy()
+		for b in biterms:
+			if b[0] not in self.word_to_idTest:
+				word_to_idTest[b[0]] = k
+				for i in xrange(self.K):
+					phiTest.append([b[0],0])
+				k += 1
+			if b[1] not in word_to_idTest:
+				word_to_idTest[b[1]] = k
+				for i in xrange(self.K):
+					phiTest.append([b[0],0])
+				k += 1
+		return phiTest
 
 	def showTopics(self, n):
 		"""
@@ -255,16 +317,17 @@ class Biterm(object):
 		Return list of n most descriptive words for each topic.
 
 		"""
+		for k in xrange(len(n_wGivenz)):
+			p[k] = sorted(self.phi[k], key=itemgetter(1), reverse = True)
 		max_phi = [[]]*self.K
 		for k in xrange(self.K):
-			max_phi[k] = [[row[0], row[1]] for row in self.phi[k][1:n+1]]
+			max_phi[k] = [[row[0], row[1]] for row in p[k][0:n]]
 		max_phi = [max_phi[i] + [self.theta[i]] for i in xrange(self.K)]
-		print max_phi
 		df = pandas.DataFrame(max_phi, 
 			['Topic ' + str(k+1) for k in xrange(self.K)], 
 			['Word ' + str(i+1) if i<n else 'P(topic)' for i in xrange(n+1)]).transpose()
 		print df
-		file_name = 'data.csv'
+		file_name = 'BestTopics' + str(self.modelID) + '.csv'
 		df.to_csv(file_name, sep='\t', encoding='utf-8')
 
 
