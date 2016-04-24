@@ -68,20 +68,27 @@ class Biterm(object):
 
 		# Initialize n_z, n_wiGivenZ, n_wjGivenZ, the later two are stored in self.n_wGivenz
 		self.initCount(X)
+
 		# Train
+		print N
+		print len(self.biterms)
 		for i in xrange(N):
+			t0 = time.time()
 			for j in xrange(len(self.biterms)):
 				b = self.biterms[j]
 				# Draw a topic for b from P(z|x_b, B, a, b)
-				p = np.zeros(self.K)				
+				p = np.zeros(self.K)
 				p_num = (self.n_z + self.a)*(self.n_wGivenz[self.word_to_id[b[0]]]+self.b)*(self.n_wGivenz[self.word_to_id[b[1]]]+self.b)
 				p_det = self.n_bGivenz+self.M*self.b
 				p = p_num/(p_det*p_det)
 				topic = self.sample(p)
-			
 				#Update n_z, n_wiGivenZ, n_wjGivenZ
 				self.updateCount(j, topic)
+				
+				#print t1-t0
 			print i
+			t1 = time.time()
+			print t1-t0
 		self.calcPhi()
 		self.calcTheta()
 
@@ -146,12 +153,14 @@ class Biterm(object):
 
 		"""
 		# Initialize n_z
+		print self.K
 		for i in xrange(self.K):
 			self.n_z[i] = sum(self.topicDist == i)
 
 		# Make a set of all unique words.
 		word_list = []
 		for tweet in X:
+			print tweet
 			word_list += tweet
 		word_set = set(word_list)
 
@@ -274,10 +283,14 @@ class Biterm(object):
 			phi = self.addNewWords(self.bitermsTest)
 			self.smooth();
 		p_B = 0
+		print self.B
 		for i in xrange(self.B):
 			p_b = 0
 			for j in xrange(self.K):
-				p_b += self.theta[j]*phi[j][i]*phi[k][i]
+				if self.biterms:
+					wi = self.biterms[i][0]
+                	wj = self.biterms[i][0]
+                	p_b += self.theta[j]*phi[j][self.word_to_id[wi]][1]*phi[j][self.word_to_id[wj]][1]
 			p_B += -(1.0/self.B)*np.log(p_b)
 		return 2**p_B
 
@@ -317,8 +330,10 @@ class Biterm(object):
 		Return list of n most descriptive words for each topic.
 
 		"""
-		for k in xrange(len(n_wGivenz)):
-			p[k] = sorted(self.phi[k], key=itemgetter(1), reverse = True)
+		p = []
+		for k in xrange(self.K):
+			p.append(sorted(self.phi[k], key=itemgetter(1), reverse = True))
+
 		max_phi = [[]]*self.K
 		for k in xrange(self.K):
 			max_phi[k] = [[row[0], row[1]] for row in p[k][0:n]]

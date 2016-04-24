@@ -3,20 +3,25 @@ from biterm import Biterm
 import numpy as np
 import preprocess, time, pickle
 #file_name = '../Data/testdata.manualSUBSET.2009.06.14.csv'
-file_name = '../Data/training.1600000.processed.noemoticon.csv'
+#file_name = '../Data/training.1600000.processed.noemoticon.csv'
+file_name = '../Data/train-PROCESSED-FINAL.csv'
+#file_name = '../Data/train-PROCESSED.csv'
 
 tweets = loadData(file_name)
-tweets = tweets[0:200]
-tweets = preprocess.preprocess(tweets)
 
-number_of_topics = 50
-a = 1
-b = 0.01
-max_iter = 300
-mdl = 1
+tweets = preprocess.splitWords(tweets)
+
+tweets = tweets
+
+number_of_topics = 100
+a = 100.0/number_of_topics
+b = 0.001
+max_iter = 200
+mdl = 16
 
 bt = Biterm(a,b,number_of_topics,max_iter,mdl);
 start = time.time()
+
 bt.fit(tweets)
 end = time.time()
 print end - start
