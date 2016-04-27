@@ -6,3 +6,4 @@ requests>=2.9.1,<2.9.9
 twython>=3.3.0,<3.3.99
 unicodecsv>=0.14.1,<0.14.99
 scikit-learn>=0.17.1,<0.17.99
+matplotlib>=1.4.0,<1.4.99

@@ -5,17 +5,17 @@ from gensim import corpora
 import numpy as np
 import preprocess
 
-num_topics_set = [50, 100, 200]
+num_topics_set = [10, 50, 100, 200]
 alpha_fracs = [1,10,50,100,250]
 betas = [0.001, 0.01, 0.1, 0.5, 1.0]
 
 num_iterations = 100
-print_topics = False
+print_topics = True
 
-train_filename = '/Users/jake/Projects/uoft/csc2515/PGM-Project/Data/train-PROCESSED-FINAL.csv'
-test_filename = '/Users/jake/Projects/uoft/csc2515/PGM-Project/Data/test-PROCESSED-FINAL.csv'
+train_filename = '../Data/train-PROCESSED-FINAL.csv'
+test_filename = '../Data/test-PROCESSED-FINAL.csv'
 
-output_file_template = "/Volumes/GOFLEX/models/{run_id}"
+output_file_template = "/Volumes/GOFLEX/models/lda/{run_id}"
 
 
 # Load in train data
@@ -62,15 +62,17 @@ for num_topics in num_topics_set:
 			output_file = output_file_template.format(run_id=run_id)
 
 			# Train and save
+			print 'Training...'
 			model = LdaMulticore(corpus, 
-				alpha=alpha, eta=beta,
+				alpha=alpha, eta=beta, passes=50,
 				id2word=dictionary, num_topics=num_topics, iterations=num_iterations
 			)
-			model.save(output_file)
+			# model.save(output_file)
+			print 'Done training'
 
 			# Print top 10 words in topics, if desired
 			if print_topics:
-				topics = model.show_topics(num_topics=2, formatted=False)
+				topics = model.show_topics(num_topics=4, formatted=False)
 				for topic in topics:
 					for tup in topic[1]:
 						print tup[0] + ": " + str(tup[1])
